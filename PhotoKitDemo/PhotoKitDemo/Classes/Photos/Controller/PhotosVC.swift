@@ -20,14 +20,13 @@ class PhotosVC: UIViewController {
     
     // 右侧下一步按钮
     lazy var rightBtn:UIButton = {
-        let button = UIButton(frame: CGRect(origin: CGPoint.zero, size: CGSize(width: 50, height: 10)))
+        let button = UIButton(frame: CGRect(origin: CGPoint.zero, size: CGSize(width: 50, height: 25)))
         button.setTitle("下一步", for: .normal)
         button.setTitleColor(UIColor.white, for: .normal)
         button.titleLabel!.font = UIFont.systemFont(ofSize: 11)
         button.backgroundColor = UIColor.orange
         return button
     }()
-    
     lazy var rightBarButtonItem:UIBarButtonItem = {
         let rightBarButtonItem = UIBarButtonItem(customView: rightBtn)
         return rightBarButtonItem
@@ -77,7 +76,10 @@ class PhotosVC: UIViewController {
     var selectedCount:Int = 0 {
         didSet {
             if selectedCount > 0 {
-                self.rightBtn.setTitle("下一步(\(selectedCount)", for: .normal)
+                self.rightBtn.setTitle("下一步(\(selectedCount))", for: .normal)
+                let textWidth = NSString.init(string: self.rightBtn.titleLabel!.text!).boundingRect(with: CGSize.init(width: 50, height: 10), options: NSStringDrawingOptions.usesLineFragmentOrigin, attributes: [NSAttributedStringKey.font : UIFont.systemFont(ofSize: 11)], context: nil).size.width
+                self.rightBtn.frame.size.width = textWidth + 10
+                
             } else {
                 self.rightBtn.setTitle("下一步", for: .normal)
             }
@@ -86,6 +88,9 @@ class PhotosVC: UIViewController {
     
     // 胶卷数据
     var assetResultsArray:[PHAsset]?
+    
+    // 照片数据
+    var photosArray:[PhotoModel]?
     
     // 智能相册统计
     var smartAlbumsArray:[SmartAlbum] = []
@@ -184,14 +189,12 @@ extension PhotosVC {
             let fetchResults = PHAsset.fetchAssets(in: collection, options: nil)
             if fetchResults.count > 0 {
                 PHImageManager().requestImage(for: fetchResults.lastObject!, targetSize: PhotoCell.fetchImageSize, contentMode: .aspectFill, options: PhotoCell.imagePHOption, resultHandler: { (image, info) in
-                    
                     smartAlbum = SmartAlbum()
                     smartAlbum.pictureCount = fetchResults.count
                     smartAlbum.albumTitle = collection.localizedTitle!
                     smartAlbum.albumType = collection.assetCollectionSubtype.rawValue
                     smartAlbum.coverPhotoImage = image
                     self.smartAlbumsArray.append(smartAlbum)
-                    
                 })
             }
         }
@@ -209,6 +212,7 @@ extension PhotosVC {
         
         print("开始取照片...")
         assetResultsArray = []
+        photosArray = []
 
         // 设置查询参数 - 如果是获取胶卷中的数据，不能够设置时间排序
         // let options = PHFetchOptions()
@@ -223,6 +227,10 @@ extension PhotosVC {
             self.assetResultsArray!.sort(by: { (asset1, asset2) -> Bool in
                 return asset1.creationDate! < asset2.creationDate!
             })
+        }
+        
+        self.assetResultsArray!.forEach { (asset) in
+            self.photosArray!.append(PhotoModel(asset: asset))
         }
 
         /**
@@ -272,6 +280,7 @@ extension PhotosVC : SmartAlbumsViewDelegate {
         var title:String = ""
         
         assetResultsArray = []
+        photosArray = []
         let smartCollectionResults = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .any, options: nil)
         smartCollectionResults.enumerateObjects { (collection, index, stop) in
             // 根据相册类型获取数据
@@ -280,10 +289,14 @@ extension PhotosVC : SmartAlbumsViewDelegate {
                 let fetchResults = PHAsset.fetchAssets(in: collection, options: nil)
                 if fetchResults.count > 0 {
                     fetchResults.enumerateObjects({ (asset, index, stop) in
-                        self.assetResultsArray!.append(asset)
+                        self.photosArray?.append(PhotoModel(asset: asset))
                     })
                 }
             }
+        }
+        
+        self.assetResultsArray!.forEach { (asset) in
+            self.photosArray!.append(PhotoModel(asset: asset))
         }
         
         // 刷新collectionView
@@ -312,12 +325,19 @@ extension PhotosVC : PHPhotoLibraryChangeObserver {
 extension PhotosVC : UICollectionViewDataSource, UICollectionViewDelegate {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return self.assetResultsArray?.count ?? 0
+        self.selectedCount = 0
+        return self.photosArray?.count ?? 0
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as! PhotoCell
-        cell.asset = self.assetResultsArray![indexPath.item]
+        cell.photoModel = self.photosArray![indexPath.item]
+        
+        let isSelected = self.photosArray![indexPath.item].isSelected
+        cell.selectBtn.isSelected = isSelected
+        if isSelected {
+            self.selectedCount += 1
+        }
         cell.delegate = self
         return cell
     }
@@ -327,7 +347,7 @@ extension PhotosVC : UICollectionViewDataSource, UICollectionViewDelegate {
         let photoDetailVC = PhotoDetailVC()
         photoDetailVC.selectedCell = collectionView.cellForItem(at: indexPath) as? PhotoCell
         photoDetailVC.indexPath = indexPath
-        photoDetailVC.assetResultsArray = self.assetResultsArray
+        photoDetailVC.photosArray = self.photosArray!
         self.navigationController?.delegate = photoDetailVC
         self.navigationController?.pushViewController(photoDetailVC, animated: true)
         

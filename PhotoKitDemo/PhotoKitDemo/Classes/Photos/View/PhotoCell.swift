@@ -66,16 +66,16 @@ class PhotoCell: UICollectionViewCell {
         imageView.isUserInteractionEnabled = true
         return imageView
     }()
- 
-    var asset:PHAsset? {
+    
+    var photoModel:PhotoModel? {
         didSet {
-            PHCachingImageManager().requestImage(for: asset!, targetSize: PhotoCell.fetchImageSize, contentMode: .aspectFit, options: PhotoCell.imagePHOption) { (image, info) in
-               
+            let asset = photoModel!.asset!
+            PHCachingImageManager().requestImage(for: asset, targetSize: PhotoCell.fetchImageSize, contentMode: .aspectFit, options: PhotoCell.imagePHOption) { (image, info) in
+                
                 self.timeLabel?.isHidden = true
-                if self.asset!.mediaType.rawValue == 2 {
-                    
+                if asset.mediaType.rawValue == 2 {
                     // 添加时间
-                    let time = self.asset!.duration.formatHourMinueSecond()
+                    let time = asset.duration.formatHourMinueSecond()
                     let dicts = [ NSAttributedStringKey.foregroundColor: UIColor.white, NSAttributedStringKey.font: UIFont.systemFont(ofSize: 12, weight: UIFont.Weight(rawValue: 1)) ]
                     let timeSize = NSString(string: time).size(withAttributes: dicts)
                     let timeLabelRect = CGRect(origin: CGPoint.init(x: self.bounds.size.width - 5 - timeSize.width, y: self.bounds.size.height - 5 - timeSize.height), size: timeSize)
@@ -95,10 +95,17 @@ class PhotoCell: UICollectionViewCell {
         }
     }
     
+    // 选择图片
     @objc func chooseImage(sender:UIButton) {
         sender.isSelected = !sender.isSelected
-        var count = sender.isSelected ? 1 : -1
+        
+        // 计算选中的数量
+        let count = sender.isSelected ? 1 : -1
         delegate?.chooseImage(addCount: count)
+        
+        // 是否选中
+        self.photoModel!.isSelected = sender.isSelected
+        
     }
     
 }

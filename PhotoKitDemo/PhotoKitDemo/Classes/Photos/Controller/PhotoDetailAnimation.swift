@@ -42,6 +42,9 @@ class PhotoDetailAnimation: NSObject, UIViewControllerAnimatedTransitioning {
         let toVC = transitionContext.viewController(forKey: .to) as! PhotoDetailVC
         let containerView = transitionContext.containerView
         let selectedCell = toVC.selectedCell!
+        // 勾选照片的数量
+        toVC.selectedCount = fromVC.selectedCount
+        toVC.selectedCell!.selectBtn.isHidden = true
         
         let snapshotView = selectedCell.photoImageView.snapshotView(afterScreenUpdates: true)!
         snapshotView.frame = containerView.convert(selectedCell.photoImageView.frame, from: selectedCell)
@@ -50,13 +53,20 @@ class PhotoDetailAnimation: NSObject, UIViewControllerAnimatedTransitioning {
         containerView.addSubview(snapshotView)
         toVC.view.frame = transitionContext.finalFrame(for: toVC)
         
-        UIView.animate(withDuration: 0.1, animations: {
-            snapshotView.frame = containerView.convert(toVC.cellRect, from: toVC.detailCell)
-            toVC.photosCollectionView.scrollToItem(at: toVC.indexPath!, at: .right, animated: false)
+        // 当前cell是否选中
+        let isSelected = selectedCell.photoModel!.isSelected
+        // 照片详情页 右上角选中标识
+        toVC.rightSelectedButton.isSelected = isSelected
+        
+        // 目标cell的图片尺寸
+        toVC.photosCollectionView.scrollToItem(at: toVC.indexPath!, at: .right, animated: true)
+        
+        UIView.animate(withDuration: 0.25, animations: {
+            snapshotView.frame = containerView.convert( toVC.cellRect, from: toVC.detailCell)
         }) { (isFinished) in
-            print(Thread.current)
             toVC.view.alpha = 1
             snapshotView.removeFromSuperview()
+            toVC.selectedCell!.selectBtn.isHidden = false
             transitionContext.completeTransition(true)
         }
     }
@@ -69,24 +79,30 @@ class PhotoDetailAnimation: NSObject, UIViewControllerAnimatedTransitioning {
         let containerView = transitionContext.containerView
         
         let x = fromVC.photosCollectionView.contentOffset.x
+        let indexPath = IndexPath.init(item: Int(x / SCREEN_W), section: 0)
         let currentCell = fromVC.photosCollectionView.cellForItem(at: IndexPath.init(item: Int(x / SCREEN_W), section: 0)) as! PhotoDetailCell
         let snapshotView = currentCell.largeImageView!.snapshotView(afterScreenUpdates: true)!
-        snapshotView.frame = containerView.convert(currentCell.largeImageView.frame, from: currentCell)
+        snapshotView.frame = containerView.convert(currentCell.largeImageView.frame, from: currentCell.largeImageView)
         containerView.insertSubview(toVC.view, aboveSubview: fromVC.view)
         containerView.addSubview(snapshotView)
         toVC.view.frame = transitionContext.finalFrame(for: toVC)
         
-        let sourceCell = toVC.photoCollection.cellForItem(at: IndexPath.init(item: Int(x / SCREEN_W), section: 0)) as! PhotoCell
-        sourceCell.photoImageView.isHidden = true
-        print(sourceCell.photoImageView.frame)
+        // 隐藏对应的列表中的cell
+        let targetCell = toVC.photoCollection.cellForItem(at: indexPath) as! PhotoCell
+        targetCell.isHidden = true
+ 
+        print(targetCell.photoImageView.frame)
         
         UIView.animate(withDuration: 0.5, animations: {
-            snapshotView.frame = containerView.convert(sourceCell.photoImageView.frame, from: sourceCell)
+            snapshotView.frame = containerView.convert(targetCell.photoImageView.frame, from: targetCell)
         }) { (isFinished) in
-            sourceCell.photoImageView.isHidden = false
+            targetCell.isHidden = false
             snapshotView.removeFromSuperview()
+            toVC.photosArray = fromVC.photosArray!
+            toVC.photoCollection.reloadData()
             transitionContext.completeTransition(true)
         }
+
     }
     
 }
